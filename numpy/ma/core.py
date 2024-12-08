@@ -21,12 +21,12 @@ Released for unlimited redistribution.
 """
 # pylint: disable-msg=E1002
 import builtins
+import functools
 import inspect
 import operator
 import warnings
 import textwrap
 import re
-from functools import reduce
 from typing import Dict
 
 import numpy as np
@@ -939,6 +939,7 @@ class _MaskedUFunc:
         self.f = ufunc
         self.__doc__ = ufunc.__doc__
         self.__name__ = ufunc.__name__
+        self.__qualname__ = ufunc.__qualname__
 
     def __str__(self):
         return f"Masked version of {self.f}"
@@ -1309,15 +1310,13 @@ hypot = _MaskedBinaryOperation(umath.hypot)
 
 # Domained binary ufuncs
 divide = _DomainedBinaryOperation(umath.divide, _DomainSafeDivide(), 0, 1)
-true_divide = _DomainedBinaryOperation(umath.true_divide,
-                                       _DomainSafeDivide(), 0, 1)
+true_divide = divide  # Since Python 3 just an alias for divide.
 floor_divide = _DomainedBinaryOperation(umath.floor_divide,
                                         _DomainSafeDivide(), 0, 1)
 remainder = _DomainedBinaryOperation(umath.remainder,
                                      _DomainSafeDivide(), 0, 1)
 fmod = _DomainedBinaryOperation(umath.fmod, _DomainSafeDivide(), 0, 1)
-mod = _DomainedBinaryOperation(umath.mod, _DomainSafeDivide(), 0, 1)
-
+mod = remainder
 
 ###############################################################################
 #                        Mask creation functions                              #
@@ -3157,7 +3156,7 @@ class MaskedArray(ndarray):
             func, args, out_i = context
             # args sometimes contains outputs (gh-10459), which we don't want
             input_args = args[:func.nin]
-            m = reduce(mask_or, [getmaskarray(arg) for arg in input_args])
+            m = functools.reduce(mask_or, [getmaskarray(arg) for arg in input_args])
             # Get the domain mask
             domain = ufunc_domain.get(func)
             if domain is not None:
@@ -7099,6 +7098,7 @@ class _frommethod:
 
     def __init__(self, methodname, reversed=False):
         self.__name__ = methodname
+        self.__qualname__ = methodname
         self.__doc__ = self.getdoc()
         self.reversed = reversed
 
@@ -7142,7 +7142,7 @@ mean = _frommethod('mean')
 minimum = _extrema_operation(umath.minimum, less, minimum_fill_value)
 nonzero = _frommethod('nonzero')
 prod = _frommethod('prod')
-product = _frommethod('prod')
+product = _frommethod('product')
 ravel = _frommethod('ravel')
 repeat = _frommethod('repeat')
 shrink_mask = _frommethod('shrink_mask')
