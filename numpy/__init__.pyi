@@ -844,7 +844,8 @@ _Float64_co: TypeAlias = float | floating[_64Bit] | float32 | float16 | integer[
 _Complex64_co: TypeAlias = number[_32Bit] | number[_16Bit] | number[_8Bit] | builtins.bool | np.bool
 _Complex128_co: TypeAlias = complex | number[_64Bit] | _Complex64_co
 
-_ArrayIndexLike: TypeAlias = SupportsIndex | slice | EllipsisType | _ArrayLikeInt_co | None
+_ToIndex: TypeAlias = SupportsIndex | slice | EllipsisType | _ArrayLikeInt_co | None
+_ToIndices: TypeAlias = _ToIndex | tuple[_ToIndex, ...]
 
 _UnsignedIntegerCType: TypeAlias = type[
     ct.c_uint8 | ct.c_uint16 | ct.c_uint32 | ct.c_uint64
@@ -858,7 +859,7 @@ _SignedIntegerCType: TypeAlias = type[
 ]  # fmt: skip
 _FloatingCType: TypeAlias = type[ct.c_float | ct.c_double | ct.c_longdouble]
 _IntegerCType: TypeAlias = _UnsignedIntegerCType | _SignedIntegerCType
-_NumberCType: TypeAlias = _IntegerCType | _IntegerCType
+_NumberCType: TypeAlias = _IntegerCType
 _GenericCType: TypeAlias = _NumberCType | type[ct.c_bool | ct.c_char | ct.py_object[Any]]
 
 # some commonly used builtin types that are known to result in a
@@ -876,11 +877,11 @@ _dtype: TypeAlias = dtype[_SCT]
 _ByteOrderChar: TypeAlias = L["<", ">", "=", "|"]
 # can be anything, is case-insensitive, and only the first character matters
 _ByteOrder: TypeAlias = L[
-    "S",                # swap the current order (default)
-    "<", "L", "little", # little-endian
-    ">", "B", "big",    # big endian
-    "=", "N", "native", # native order
-    "|", "I",           # ignore
+    "S",                 # swap the current order (default)
+    "<", "L", "little",  # little-endian
+    ">", "B", "big",     # big endian
+    "=", "N", "native",  # native order
+    "|", "I",            # ignore
 ]  # fmt: skip
 _DTypeKind: TypeAlias = L[
     "b",  # boolean
@@ -960,9 +961,9 @@ _ArrayAPIVersion: TypeAlias = L["2021.12", "2022.12", "2023.12"]
 
 _CastingKind: TypeAlias = L["no", "equiv", "safe", "same_kind", "unsafe"]
 
-_OrderKACF: TypeAlias = L[None, "K", "A", "C", "F"]
-_OrderACF: TypeAlias = L[None, "A", "C", "F"]
-_OrderCF: TypeAlias = L[None, "C", "F"]
+_OrderKACF: TypeAlias = L["K", "A", "C", "F"] | None
+_OrderACF: TypeAlias = L["A", "C", "F"] | None
+_OrderCF: TypeAlias = L["C", "F"] | None
 
 _ModeKind: TypeAlias = L["raise", "wrap", "clip"]
 _PartitionKind: TypeAlias = L["introselect"]
@@ -977,11 +978,13 @@ _SortKind: TypeAlias = L[
 _SortSide: TypeAlias = L["left", "right"]
 
 _ConvertibleToInt: TypeAlias = SupportsInt | SupportsIndex | _CharLike_co
-_ConvertibleToFloat: TypeAlias =  SupportsFloat | SupportsIndex | _CharLike_co
+_ConvertibleToFloat: TypeAlias = SupportsFloat | SupportsIndex | _CharLike_co
 if sys.version_info >= (3, 11):
     _ConvertibleToComplex: TypeAlias = SupportsComplex | SupportsFloat | SupportsIndex | _CharLike_co
 else:
     _ConvertibleToComplex: TypeAlias = complex | SupportsComplex | SupportsFloat | SupportsIndex | _CharLike_co
+_ConvertibleToTD64: TypeAlias = dt.timedelta | int | _CharLike_co | character | number | timedelta64 | np.bool | None
+_ConvertibleToDT64: TypeAlias = dt.date | int | _CharLike_co | character | number | datetime64 | np.bool | None
 
 _NDIterFlagsKind: TypeAlias = L[
     "buffered",
@@ -1025,7 +1028,7 @@ _MemMapModeKind: TypeAlias = L[
 
 _DT64Date: TypeAlias = _HasDateAttributes | L["TODAY", "today", b"TODAY", b"today"]
 _DT64Now: TypeAlias = L["NOW", "now", b"NOW", b"now"]
-_NaTValue: TypeAlias = L["NAT","NaT", "nat",b"NAT", b"NaT", b"nat"]
+_NaTValue: TypeAlias = L["NAT", "NaT", "nat", b"NAT", b"NaT", b"nat"]
 
 _MonthUnit: TypeAlias = L["Y", "M", b"Y", b"M"]
 _DayUnit: TypeAlias = L["W", "D", b"W", b"D"]
@@ -1048,8 +1051,7 @@ class _SupportsFileMethods(SupportsFlush, Protocol):
     def seek(self, offset: int, whence: int, /) -> object: ...
 
 @type_check_only
-class _SupportsFileMethodsRW(SupportsWrite[bytes], _SupportsFileMethods, Protocol):
-    pass
+class _SupportsFileMethodsRW(SupportsWrite[bytes], _SupportsFileMethods, Protocol): ...
 
 @type_check_only
 class _SupportsItem(Protocol[_T_co]):
@@ -1065,12 +1067,11 @@ class _HasShape(Protocol[_ShapeT_co]):
     def shape(self, /) -> _ShapeT_co: ...
 
 @type_check_only
-class _HasShapeAndSupportsItem(_HasShape[_ShapeT_co], _SupportsItem[_T_co], Protocol[_ShapeT_co, _T_co]):
-    pass
+class _HasShapeAndSupportsItem(_HasShape[_ShapeT_co], _SupportsItem[_T_co], Protocol[_ShapeT_co, _T_co]): ...
 
 # matches any `x` on `x.type.item() -> _T_co`, e.g. `dtype[np.int8]` gives `_T_co: int`
 @type_check_only
-class _HashTypeWithItem(Protocol[_T_co]):
+class _HasTypeWithItem(Protocol[_T_co]):
     @property
     def type(self, /) -> type[_SupportsItem[_T_co]]: ...
 
@@ -1082,7 +1083,7 @@ class _HasShapeAndDTypeWithItem(Protocol[_ShapeT_co, _T_co]):
     @property
     def shape(self, /) -> _ShapeT_co: ...
     @property
-    def dtype(self, /) -> _HashTypeWithItem[_T_co]: ...
+    def dtype(self, /) -> _HasTypeWithItem[_T_co]: ...
 
 @type_check_only
 class _HasRealAndImag(Protocol[_RealT_co, _ImagT_co]):
@@ -1580,7 +1581,6 @@ class dtype(Generic[_SCT_co]):
     @property
     def type(self) -> type[_SCT_co]: ...
 
-
 @final
 class flatiter(Generic[_ArrayT_co]):
     __hash__: ClassVar[None]
@@ -2006,7 +2006,6 @@ class _ArrayOrScalarCommon:
         correction: float = ...,
     ) -> _ArrayT: ...
 
-
 class ndarray(_ArrayOrScalarCommon, Generic[_ShapeT_co, _DType_co]):
     __hash__: ClassVar[None]  # type: ignore[assignment]  # pyright: ignore[reportIncompatibleMethodOverride]
     @property
@@ -2082,16 +2081,56 @@ class ndarray(_ArrayOrScalarCommon, Generic[_ShapeT_co, _DType_co]):
     @overload
     def __getitem__(self, key: SupportsIndex | tuple[SupportsIndex, ...], /) -> Any: ...
     @overload
-    def __getitem__(self, key: _ArrayIndexLike | tuple[_ArrayIndexLike, ...], /) -> ndarray[_Shape, _DType_co]: ...
+    def __getitem__(self, key: _ToIndices, /) -> ndarray[_Shape, _DType_co]: ...
     @overload
     def __getitem__(self: NDArray[void], key: str, /) -> ndarray[_ShapeT_co, np.dtype[Any]]: ...
     @overload
     def __getitem__(self: NDArray[void], key: list[str], /) -> ndarray[_ShapeT_co, _dtype[void]]: ...
 
-    @overload
-    def __setitem__(self: NDArray[void], key: str | list[str], value: ArrayLike, /) -> None: ...
-    @overload
-    def __setitem__(self, key: _ArrayIndexLike | tuple[_ArrayIndexLike, ...], value: ArrayLike, /) -> None: ...
+    @overload  # flexible | object_ | bool
+    def __setitem__(
+        self: ndarray[Any, dtype[flexible | object_ | np.bool] | dtypes.StringDType],
+        key: _ToIndices,
+        value: object,
+        /,
+    ) -> None: ...
+    @overload  # integer
+    def __setitem__(
+        self: NDArray[integer],
+        key: _ToIndices,
+        value: _ConvertibleToInt | _NestedSequence[_ConvertibleToInt] | _ArrayLikeInt_co,
+        /,
+    ) -> None: ...
+    @overload  # floating
+    def __setitem__(
+        self: NDArray[floating],
+        key: _ToIndices,
+        value: _ConvertibleToFloat | _NestedSequence[_ConvertibleToFloat | None] | _ArrayLikeFloat_co | None,
+        /,
+    ) -> None: ...
+    @overload  # complexfloating
+    def __setitem__(
+        self: NDArray[complexfloating],
+        key: _ToIndices,
+        value: _ConvertibleToComplex | _NestedSequence[_ConvertibleToComplex | None] | _ArrayLikeNumber_co | None,
+        /,
+    ) -> None: ...
+    @overload  # timedelta64
+    def __setitem__(
+        self: NDArray[timedelta64],
+        key: _ToIndices,
+        value: _ConvertibleToTD64 | _NestedSequence[_ConvertibleToTD64],
+        /,
+    ) -> None: ...
+    @overload  # datetime64
+    def __setitem__(
+        self: NDArray[datetime64],
+        key: _ToIndices,
+        value: _ConvertibleToDT64 | _NestedSequence[_ConvertibleToDT64],
+        /,
+    ) -> None: ...
+    @overload  # catch-all
+    def __setitem__(self, key: _ToIndices, value: ArrayLike, /) -> None: ...
 
     @property
     def ctypes(self) -> _ctypes[int]: ...
@@ -3963,7 +4002,6 @@ class float64(floating[_64Bit], float):  # type: ignore[misc]
     def __divmod__(self, other: _Float64_co, /) -> _2Tuple[float64]: ...  # type: ignore[override]
     def __rdivmod__(self, other: _Float64_co, /) -> _2Tuple[float64]: ...  # type: ignore[override]
 
-
 half: TypeAlias = floating[_NBitHalf]
 single: TypeAlias = floating[_NBitSingle]
 double: TypeAlias = floating[_NBitDouble]
@@ -4122,16 +4160,16 @@ class timedelta64(_IntegralMixin, generic[_TD64ItemT_co], Generic[_TD64ItemT_co]
     @overload
     def __init__(self: timedelta64[int], value: dt.timedelta, format: _TimeUnitSpec[_IntTimeUnit], /) -> None: ...
     @overload
-    def __init__(self: timedelta64[int], value: int, format: _TimeUnitSpec[_IntTD64Unit] = ..., /) -> None: ...
+    def __init__(self: timedelta64[int], value: _IntLike_co, format: _TimeUnitSpec[_IntTD64Unit] = ..., /) -> None: ...
     @overload
     def __init__(
         self: timedelta64[dt.timedelta],
-        value: dt.timedelta | int,
+        value: dt.timedelta | _IntLike_co,
         format: _TimeUnitSpec[_NativeTD64Unit] = ...,
         /,
     ) -> None: ...
     @overload
-    def __init__(self, value: int | bytes | str | dt.timedelta | None, format: _TimeUnitSpec = ..., /) -> None: ...
+    def __init__(self, value: _ConvertibleToTD64, format: _TimeUnitSpec = ..., /) -> None: ...
 
     # NOTE: Only a limited number of units support conversion
     # to builtin scalar types: `Y`, `M`, `ns`, `ps`, `fs`, `as`
@@ -4679,7 +4717,6 @@ class finfo(Generic[_FloatingT_co]):
         cls, dtype: str
     ) -> finfo[floating[Any]]: ...
 
-
 class iinfo(Generic[_IntegerT_co]):
     dtype: Final[dtype[_IntegerT_co]]
     kind: Final[LiteralString]
@@ -4912,7 +4949,6 @@ class poly1d:
         k: None | _ArrayLikeComplex_co | _ArrayLikeObject_co = ...,
     ) -> poly1d: ...
 
-
 class matrix(ndarray[_2DShapeT_co, _DType_co]):
     __array_priority__: ClassVar[float]
     def __new__(
@@ -5049,7 +5085,7 @@ class matrix(ndarray[_2DShapeT_co, _DType_co]):
     @property
     def T(self) -> matrix[_2D, _DType_co]: ...
     @property
-    def I(self) -> matrix[_2D, Any]: ...
+    def I(self) -> matrix[_2D, Any]: ...  # noqa: E743
     @property
     def A(self) -> ndarray[_2DShapeT_co, _DType_co]: ...
     @property
@@ -5061,7 +5097,6 @@ class matrix(ndarray[_2DShapeT_co, _DType_co]):
     def getA(self) -> ndarray[_2DShapeT_co, _DType_co]: ...
     def getA1(self) -> ndarray[_Shape, _DType_co]: ...
     def getH(self) -> matrix[_2D, _DType_co]: ...
-
 
 def from_dlpack(
     x: _SupportsDLPack[None],
